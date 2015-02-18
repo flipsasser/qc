@@ -47,8 +47,30 @@ Capture.prototype.updateWindow = function(width, height) {
   });
 };
 
-chrome.browserAction.onClicked.addListener(function() {
+function capture() {
   chrome.windows.getCurrent({populate: true}, function(window) {
     new Capture(window, 1024, 768);
+  });
+}
+
+function addContextFor(seconds) {
+  chrome.contextMenus.create({
+    "id":       seconds.toString(),
+    "title":    seconds + " second delayed capture",
+    "contexts": ["browser_action", "page"]
+  });
+}
+
+chrome.browserAction.onClicked.addListener(capture)
+
+chrome.runtime.onInstalled.addListener(function() {
+  addContextFor(1);
+  addContextFor(2);
+  addContextFor(5);
+  addContextFor(10);
+  chrome.contextMenus.onClicked.addListener(function(menuItem, tab) {
+    var seconds = parseInt(menuItem.menuItemId);
+    console.log(seconds);
+    setTimeout(capture, seconds * 1000);
   });
 });
