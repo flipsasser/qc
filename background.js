@@ -19,16 +19,15 @@ Capture.prototype.capture = function() {
 };
 
 Capture.prototype.checkSize = function(width, height) {
-  this.attempts++;
-  if (width == this.targetWidth && height == this.targetHeight) {
+  if ((this.attempts && this.attempts > 2) ||
+      (width == this.targetWidth && height == this.targetHeight)) {
     this.capture();
   } else if (this.attempts == 1) {
     this.updateWindow(this.targetWidth, this.targetHeight);
   } else if (this.attempts <= 2) {
-    var offsetWidth = this.targetWidth - width;
-    var offsetHeight = this.targetHeight - height;
-    this.updateWindow(this.targetWidth + offsetWidth, this.targetHeight + offsetHeight);
+    this.updateWindow(this.targetWidth, this.targetHeight);
   }
+  this.attempts++;
 };
 
 Capture.prototype.getSize = function() {
@@ -47,30 +46,58 @@ Capture.prototype.updateWindow = function(width, height) {
   });
 };
 
-function capture() {
+function capture(width, height) {
+  if (typeof(width) == 'undefined') {
+    width  = 1024;
+    height = 768;
+  }
   chrome.windows.getCurrent({populate: true}, function(window) {
-    new Capture(window, 1024, 768);
+    new Capture(window, width, height);
   });
 }
 
-function addContextFor(seconds) {
-  chrome.contextMenus.create({
-    "id":       seconds.toString(),
-    "title":    seconds + " second delayed capture",
-    "contexts": ["browser_action", "page"]
-  });
-}
-
-chrome.browserAction.onClicked.addListener(capture)
+chrome.browserAction.onClicked.addListener(function() { capture(1025, 768); });
 
 chrome.runtime.onInstalled.addListener(function() {
-  addContextFor(1);
-  addContextFor(2);
-  addContextFor(5);
-  addContextFor(10);
+  addContextFor("iPhone", 357, 667);
+  addContextFor("iPad", 768, 1024);
+  addContextFor("Desktop", 1024, 768);
+  addContextFor("Large Desktop", 1280, 1024);
+
   chrome.contextMenus.onClicked.addListener(function(menuItem, tab) {
-    var seconds = parseInt(menuItem.menuItemId);
-    console.log(seconds);
-    setTimeout(capture, seconds * 1000);
+    var parts   = menuItem.menuItemId.split("x");
+    var seconds = parseInt(parts[0]);
+    var width   = parseInt(parts[1]);
+    var height  = parseInt(parts[2]);
+    setTimeout(function() { capture(width, height); }, seconds * 1000);
   });
 });
+
+var added = false;
+
+function addContextFor(label, width, height) {
+  if (added) {
+    chrome.contextMenus.create({
+      "id":       "separator-" + label,
+      "contexts": ["browser_action", "page"],
+      "type":     "separator"
+    });
+  }
+
+  var dimensions = width.toString() + "x" + height.toString();
+  var addContext = function(id, caption) {
+    chrome.contextMenus.create({
+      "id":       id + "x" + dimensions,
+      "title":    label + (caption ? " (" + caption + ")" : ""),
+      "contexts": ["browser_action", "page"]
+    });
+  };
+
+  addContext(0, dimensions);
+  addContext(1, "1 second delay");
+  addContext(2, "2 second delay");
+  addContext(5, "3 second delay");
+  addContext(10, "10 second delay");
+  added = true;
+}
+
